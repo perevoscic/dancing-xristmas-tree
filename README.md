@@ -19,5 +19,5 @@ You should see a blinking, gift-wrapped tree sitting on the marker.
 
 ## Using your custom marker
 - Pattern file: `pattern-2.patt`
-- Preview image to print/show: `2.png` (this is the marker the camera should see)
+- Preview image to print/show: `2.png` (alias: `pattern-2.png`) — this is the marker the camera should see
 - Keep both files in the repo root (or same folder as `index.html`) so the AR marker loads.
