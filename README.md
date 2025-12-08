@@ -16,3 +16,8 @@ You should see a blinking, gift-wrapped tree sitting on the marker.
 3) In the repo: Settings → Pages → Source = `Deploy from a branch`, Branch = `main`, Folder = `/ (root)`. Save.  
 4) Wait ~1 minute; your site will be live at `https://<your-user>.github.io/ar-xmas-tree`.  
 5) Test on phone: open that URL (use HTTPS), allow camera, and show your printed marker.
+
+## Using your custom marker
+- Pattern file: `pattern-2.patt`
+- Preview image to print/show: `2.png` (this is the marker the camera should see)
+- Keep both files in the repo root (or same folder as `index.html`) so the AR marker loads.
