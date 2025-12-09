@@ -3231,22 +3231,13 @@ ARjs.Source.prototype.copyElementSizeTo = function(otherElement){
 */
 
 ARjs.Source.prototype.copyElementSizeTo = function (otherElement) {
-
-    if (window.innerWidth > window.innerHeight) {
-        //landscape
-        otherElement.style.width = this.domElement.style.width
-        otherElement.style.height = this.domElement.style.height
-        otherElement.style.marginLeft = this.domElement.style.marginLeft
-        otherElement.style.marginTop = this.domElement.style.marginTop
-    }
-    else {
-        //portrait
-        otherElement.style.height = this.domElement.style.height
-        otherElement.style.width = (parseInt(otherElement.style.height) * 4 / 3) + "px";
-        otherElement.style.marginLeft = ((window.innerWidth - parseInt(otherElement.style.width)) / 2) + "px";
-        otherElement.style.marginTop = 0;
-    }
-
+    // Keep the target element exactly in sync with the source element dimensions/margins.
+    // This mirrors the upstream AR.js implementation to avoid forcing a fixed aspect (e.g., 4:3)
+    // that was squashing the WebGL canvas on portrait mobile devices.
+    otherElement.style.width = this.domElement.style.width
+    otherElement.style.height = this.domElement.style.height
+    otherElement.style.marginLeft = this.domElement.style.marginLeft
+    otherElement.style.marginTop = this.domElement.style.marginTop
 }
 
 //////////////////////////////////////////////////////////////////////////////
