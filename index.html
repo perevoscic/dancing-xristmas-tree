@@ -12,10 +12,15 @@
 
     <style>
 
-        body {
+        html, body {
             margin: 0;
             overflow: hidden;
             font-family: 'Courier New', Courier, monospace;
+            background: transparent;
+        }
+
+        canvas {
+            background: transparent !important;
         }
 
 
@@ -305,7 +310,7 @@
 
         let scene, camera, renderer, composer;
 
-        let treeGroup, binarySnowSystem;
+        let treeGroup, binarySnowSystem, videoTexture;
         let arToolkitSource, arToolkitContext, markerRoot, contentRoot;
         let markerVisibleLast = false;
 
@@ -477,7 +482,11 @@
 
             window.addEventListener('resize', onResize);
 
-            document.getElementById('toggle-dance').addEventListener('click', () => config.isDancing = !config.isDancing);
+            const danceBtn = document.getElementById('toggle-dance');
+            danceBtn.addEventListener('click', () => {
+                config.isDancing = !config.isDancing;
+                updateDanceLabel();
+            });
             document.getElementById('reset-pose').addEventListener('click', resetPose);
 
 
@@ -492,6 +501,7 @@
 
             setTimeout(() => hideLoader(), 1500);
 
+            updateDanceLabel();
         }
 
 
@@ -503,6 +513,12 @@
             }
             if (treeGroup) treeGroup.position.set(0, 0, 0);
             if (binarySnowSystem) binarySnowSystem.position.set(0, 0, 0);
+        }
+
+        function updateDanceLabel() {
+            const danceBtn = document.getElementById('toggle-dance');
+            if (!danceBtn) return;
+            danceBtn.textContent = config.isDancing ? 'Stop Dancing' : 'Dance';
         }
 
 
@@ -1030,6 +1046,11 @@
 
         function setStatus(message) {
             if (statusText) statusText.textContent = message;
+            const bar = document.getElementById('status-bar');
+            if (bar) {
+                const hide = message.toLowerCase().includes('marker locked');
+                bar.style.display = hide ? 'none' : 'flex';
+            }
         }
 
         function setErrorStatus(message, err) {
@@ -1112,6 +1133,16 @@
 
                 arToolkitContext.init(() => {
                     camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+
+                    // Bind video as scene background so the feed shows behind the holograms
+                    const video = arToolkitSource.domElement;
+                    if (video && !videoTexture) {
+                        videoTexture = new THREE.VideoTexture(video);
+                        videoTexture.minFilter = THREE.LinearFilter;
+                        videoTexture.magFilter = THREE.LinearFilter;
+                        videoTexture.format = THREE.RGBFormat;
+                        scene.background = videoTexture;
+                    }
                 });
 
                 markerRoot = new THREE.Group();
