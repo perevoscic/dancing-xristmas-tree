@@ -2,93 +2,330 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AR Christmas Tree</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>AR Dancing Christmas Tree</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #02040a; color: #e5f4ff; font-family: Arial, sans-serif; }
-    #help { position: fixed; top: 12px; left: 12px; padding: 10px 12px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; max-width: 320px; line-height: 1.35; }
-    #help a { color: #7cd3ff; }
-    #status { position: fixed; bottom: 12px; left: 12px; padding: 10px 12px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; max-width: 360px; line-height: 1.35; color: #ffcccc; font-size: 14px; }
-    video#arjs-video { object-fit: contain !important; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #1a1a1a;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #ar-video {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      z-index: 0;
+      display: none;
+    }
+    #canvas-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      pointer-events: auto;
+    }
+    #ui-layer {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      width: 100%;
+      z-index: 2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+    }
+    button {
+      pointer-events: auto;
+      background: rgba(255, 255, 255, 0.9);
+      border: none;
+      border-radius: 30px;
+      padding: 12px 24px;
+      font-weight: bold;
+      color: #333;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+      cursor: pointer;
+      transition: transform 0.1s, background 0.2s;
+      font-size: 1rem;
+    }
+    button:active { transform: scale(0.95); }
+    button.primary { background: #ff4757; color: white; }
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      z-index: 3;
+      font-size: 1.2rem;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      pointer-events: none;
+      transition: opacity 0.5s;
+    }
+    #error-msg {
+      display: none;
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 0, 0, 0.8);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      z-index: 10;
+      font-size: 0.9rem;
+    }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-  <div id="help">
-    Allow camera access, point at your custom marker, and watch the tree land on it.
-    The tree only appears when the preview image <code>2.png</code> (generated with <code>pattern-2.patt</code>) is in view.
+  <video id="ar-video" playsinline muted autoplay></video>
+  <div id="canvas-container"></div>
+  <div id="loading">Initializing AR Tree...</div>
+  <div id="error-msg">Camera unavailable. Using Snow Mode.</div>
+  <div id="ui-layer">
+    <button id="toggle-dance" class="primary">Stop Dancing</button>
+    <button id="reset-cam">Reset View</button>
   </div>
-  <div id="status" hidden></div>
-
-  <a-scene
-    embedded
-    vr-mode-ui="enabled: false"
-    renderer="antialias: true"
-    arjs="sourceType: webcam; facingMode: environment; sourceWidth: 1280; sourceHeight: 720; displayWidth: 1280; displayHeight: 720; debugUIEnabled: false;"
-  >
-    <a-assets>
-      <a-mixin id="light-bulb" geometry="primitive: sphere; radius: 0.04" material="color: #ffd45c; emissive: #ffd45c"></a-mixin>
-    </a-assets>
-
-    <a-marker type="pattern" url="pattern-2.patt">
-      <a-entity id="tree" position="0 0 0" rotation="-90 0 0" scale="0.7 0.7 0.7">
-        <!-- Trunk -->
-        <a-cylinder position="0 0.18 0" radius="0.12" height="0.35" color="#5b3a1a"></a-cylinder>
-        <!-- Layers of pine -->
-        <a-cone position="0 0.45 0" radius-bottom="0.5" radius-top="0.05" height="0.55" color="#1f8a43"></a-cone>
-        <a-cone position="0 0.8 0" radius-bottom="0.4" radius-top="0.04" height="0.5" color="#1a6f37"></a-cone>
-        <a-cone position="0 1.1 0" radius-bottom="0.32" radius-top="0.03" height="0.45" color="#13582c"></a-cone>
-        <!-- Star -->
-        <a-octahedron position="0 1.35 0" radius="0.08" color="#ffd45c" material="emissive: #ffd45c; emissiveIntensity: 1.5"></a-octahedron>
-        <!-- Presents -->
-        <a-box depth="0.22" height="0.18" width="0.22" position="0.3 0.09 0.05" color="#c43a3a"></a-box>
-        <a-box depth="0.2" height="0.16" width="0.2" position="-0.28 0.08 -0.08" rotation="0 20 0" color="#2a7bd6"></a-box>
-        <!-- Lights -->
-        <a-entity mixin="light-bulb" position="0.25 0.55 0.18" animation="property: material.emissiveIntensity; from: 0.1; to: 2; dir: alternate; loop: true; dur: 500; delay: 0"></a-entity>
-        <a-entity mixin="light-bulb" position="-0.22 0.7 -0.14" animation="property: material.emissiveIntensity; from: 0.1; to: 2; dir: alternate; loop: true; dur: 600; delay: 200"></a-entity>
-        <a-entity mixin="light-bulb" position="0.12 0.95 -0.22" animation="property: material.emissiveIntensity; from: 0.1; to: 2; dir: alternate; loop: true; dur: 550; delay: 120"></a-entity>
-        <a-entity mixin="light-bulb" position="-0.12 0.6 0.24" animation="property: material.emissiveIntensity; from: 0.1; to: 2; dir: alternate; loop: true; dur: 520; delay: 320"></a-entity>
-        <a-entity mixin="light-bulb" position="0.18 0.83 0.14" animation="property: material.emissiveIntensity; from: 0.1; to: 2; dir: alternate; loop: true; dur: 580; delay: 260"></a-entity>
-        <a-entity mixin="light-bulb" position="-0.15 1.05 0.05" animation="property: material.emissiveIntensity; from: 0.1; to: 2; dir: alternate; loop: true; dur: 480; delay: 80"></a-entity>
-        <!-- Greeting -->
-        <a-text value="Merry Christmas" position="0 1.5 0" rotation="90 0 0" align="center" color="#e5f4ff" width="2.5" animation="property: position; from: 0 1.45 0; to: 0 1.55 0; dir: alternate; loop: true; dur: 1400"></a-text>
-      </a-entity>
-    </a-marker>
-
-    <a-entity camera></a-entity>
-  </a-scene>
 
   <script>
-    (function () {
-      const statusBox = document.getElementById('status');
-      function showStatus(message) {
-        statusBox.textContent = message;
-        statusBox.hidden = !message;
-      }
+    const config = { danceSpeed: 3.5, danceAmplitude: 0.15, treeHeight: 3, isDancing: true };
+    let scene, camera, renderer, controls, treeGroup;
+    const clock = new THREE.Clock();
+    const videoElement = document.getElementById('ar-video');
+    const loadingElement = document.getElementById('loading');
+    const errorElement = document.getElementById('error-msg');
 
-      // Prefer listing devices to give a clearer hint if no camera is found.
-      if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-        navigator.mediaDevices.enumerateDevices()
-          .then(devices => {
-            const videoInputs = devices.filter(d => d.kind === 'videoinput');
-            if (!videoInputs.length) {
-              showStatus('No camera detected. Plug one in or try on a phone, then reload.');
-            }
-          })
-          .catch(() => {
-            /* ignore enumeration errors */
-          });
-      }
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 1.5, 5);
 
-      // AR.js emits arjs-video-error on camera failure.
-      document.querySelector('a-scene').addEventListener('arjs-video-error', e => {
-        const err = e && e.detail ? e.detail : {};
-        const name = err.name || 'UnknownError';
-        const msg = err.message || 'Check camera permissions or availability.';
-        showStatus(`Webcam Error: ${name} — ${msg} (try switching facingMode to "environment" on phones).`);
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(5, 10, 7);
+      scene.add(dirLight);
+
+      createProceduralTree();
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.target.set(0, 1.5, 0);
+
+      window.addEventListener('resize', onWindowResize, false);
+      document.getElementById('toggle-dance').addEventListener('click', toggleDance);
+      document.getElementById('reset-cam').addEventListener('click', () => {
+        camera.position.set(0, 1.5, 5);
+        controls.target.set(0, 1.5, 0);
       });
-    })();
+
+      startCamera();
+      animate();
+    }
+
+    function createProceduralTree() {
+      treeGroup = new THREE.Group();
+
+      const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.8, flatShading: true });
+      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3e2b, roughness: 1 });
+      const starMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, emissiveIntensity: 0.5, roughness: 0.2, metalness: 0.8 });
+
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 1.5, 8), trunkMat);
+      trunk.position.y = 0.75;
+      treeGroup.add(trunk);
+
+      const levels = 3;
+      for (let i = 0; i < levels; i++) {
+        const bottomRadius = 2.0 - (i * 0.5);
+        const height = 1.8;
+        const yPos = 1.5 + (i * 1.2);
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(bottomRadius, height, 16), leafMat);
+        cone.position.y = yPos;
+        addOrnaments(cone, bottomRadius, height);
+        treeGroup.add(cone);
+      }
+
+      const star = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), starMat);
+      star.position.y = 1.5 + ((levels - 1) * 1.2) + 0.8;
+      const starLight = new THREE.PointLight(0xffaa00, 1, 5);
+      star.add(starLight);
+      treeGroup.add(star);
+
+      addGreetingText();
+      treeGroup.position.set(0, -0.5, -3);
+      scene.add(treeGroup);
+    }
+
+    function addGreetingText() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = 'rgba(0,0,0,0)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#ff0000';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = '#ffcccc';
+      ctx.font = 'bold 90px Arial';
+      ctx.fillText('Merry Christmas', 512, 200);
+      ctx.font = 'bold 70px Arial';
+      ctx.fillText('from HSB IT dept', 512, 320);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 1 });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(3.5, 1.75, 1);
+      sprite.position.set(0, 2.5, 1.8);
+      treeGroup.userData.greeting = sprite;
+      treeGroup.add(sprite);
+    }
+
+    function addOrnaments(coneMesh, radius, height) {
+      const count = 30;
+      for (let i = 0; i < count; i++) {
+        const type = Math.random();
+        let mesh;
+        if (type < 0.25) mesh = createFloppy();
+        else if (type < 0.5) mesh = createUSB();
+        else if (type < 0.75) mesh = createCD();
+        else mesh = createMouse();
+
+        const angle = (i / count) * Math.PI * 2 + Math.random();
+        const yOffset = -height / 3 + (Math.random() * 0.8 - 0.4);
+        const r = radius * (0.65 + Math.random() * 0.25);
+        mesh.position.set(Math.cos(angle) * r, yOffset, Math.sin(angle) * r);
+        mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+        coneMesh.add(mesh);
+      }
+    }
+
+    function createFloppy() {
+      const group = new THREE.Group();
+      const colors = [0x0000ff, 0x333333, 0xf5f5dc];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.03), new THREE.MeshStandardMaterial({ color }));
+      const shutter = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.2, 0.035), new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.8, roughness: 0.2 }));
+      shutter.position.set(0, 0.08, 0);
+      group.add(body);
+      group.add(shutter);
+      return group;
+    }
+
+    function createUSB() {
+      const group = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.25, 0.05), new THREE.MeshStandardMaterial({ color: 0xff4444 }));
+      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.04), new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.9 }));
+      tip.position.y = 0.17;
+      group.add(body);
+      group.add(tip);
+      return group;
+    }
+
+    function createCD() {
+      return new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.01, 32), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.9, roughness: 0.1, emissive: 0x222222 }));
+    }
+
+    function createMouse() {
+      const mouse = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16).scale(1, 0.6, 1.5), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3), new THREE.MeshBasicMaterial({ color: 0x333333 }));
+      tail.position.z = -0.2;
+      tail.rotation.x = Math.PI / 2;
+      mouse.add(tail);
+      return mouse;
+    }
+
+    async function startCamera() {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+          videoElement.srcObject = stream;
+          videoElement.onloadedmetadata = () => {
+            videoElement.play();
+            videoElement.style.display = 'block';
+            loadingElement.style.opacity = 0;
+          };
+        } catch (err) {
+          console.error('Camera failed:', err);
+          handleCameraError();
+        }
+      } else {
+        handleCameraError();
+      }
+    }
+
+    function handleCameraError() {
+      loadingElement.style.opacity = 0;
+      errorElement.style.display = 'block';
+      scene.background = new THREE.Color(0x050510);
+      const particleCount = 1000;
+      const geom = new THREE.BufferGeometry();
+      const positions = [];
+      for (let i = 0; i < particleCount; i++) {
+        positions.push((Math.random() - 0.5) * 50, (Math.random() - 0.5) * 50, (Math.random() - 0.5) * 50);
+      }
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2 });
+      scene.add(new THREE.Points(geom, mat));
+    }
+
+    function toggleDance() {
+      config.isDancing = !config.isDancing;
+      const btn = document.getElementById('toggle-dance');
+      btn.textContent = config.isDancing ? 'Stop Dancing' : 'Dance!';
+      btn.className = config.isDancing ? 'primary' : '';
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const time = clock.getElapsedTime();
+      if (treeGroup && config.isDancing) {
+        const rhythm = Math.sin(time * config.danceSpeed);
+        const bend = Math.cos(time * config.danceSpeed);
+        const scaleY = 1 + (rhythm * 0.05);
+        const scaleXZ = 1 - (rhythm * 0.02);
+        treeGroup.scale.set(scaleXZ, scaleY, scaleXZ);
+        treeGroup.rotation.z = bend * 0.1;
+        treeGroup.rotation.x = Math.sin(time * config.danceSpeed * 0.5) * 0.05;
+      } else if (treeGroup) {
+        treeGroup.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
+        treeGroup.rotation.z = THREE.MathUtils.lerp(treeGroup.rotation.z, 0, 0.1);
+        treeGroup.rotation.x = THREE.MathUtils.lerp(treeGroup.rotation.x, 0, 0.1);
+      }
+      if (treeGroup && treeGroup.userData.greeting) {
+        const flash = Math.sin(time * 6) * 0.3 + 0.7;
+        treeGroup.userData.greeting.material.opacity = flash;
+        const scalePulse = 1 + Math.sin(time * 6) * 0.05;
+        treeGroup.userData.greeting.scale.set(3.5 * scalePulse, 1.75 * scalePulse, 1);
+      }
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    init();
   </script>
 </body>
 </html>
