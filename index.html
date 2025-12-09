@@ -313,7 +313,7 @@
         let scene, camera, renderer, composer;
 
         let treeGroup, binarySnowSystem, videoTexture;
-        let arToolkitSource, arToolkitContext, markerRoot, contentRoot;
+        let arToolkitSource, arToolkitContext, markerRoot, contentRoot, targetRoot;
         let markerVisibleLast = false;
 
         let clock = new THREE.Clock();
@@ -471,12 +471,12 @@
 
             buildBinarySnow();
 
-            const targetRoot = contentRoot || markerRoot || scene;
+            targetRoot = contentRoot || markerRoot || scene;
             targetRoot.add(treeGroup);
             targetRoot.add(binarySnowSystem);
-            targetRoot.scale.setScalar(config.baseScale);
             targetRoot.position.set(0, 0, 0);
             targetRoot.rotation.set(0, 0, 0);
+            applyContentScale();
 
 
 
@@ -1067,6 +1067,17 @@
         }
 
 
+        function applyContentScale() {
+            if (!targetRoot || !renderer) return;
+            const width = renderer.domElement?.width || window.innerWidth || 1;
+            const height = renderer.domElement?.height || window.innerHeight || 1;
+            const aspect = height / width;
+            const widen = aspect > 1 ? aspect : 1; // only widen in portrait
+            const base = config.baseScale;
+            targetRoot.scale.set(base * widen, base, base * widen);
+        }
+
+
         function attachARVideo() {
             const video = arToolkitSource.domElement;
             if (!video) return;
@@ -1179,12 +1190,21 @@
                 arToolkitSource.copyElementSizeTo(renderer.domElement);
                 if (arToolkitContext && arToolkitContext.arController !== null) {
                     arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
+                    // Keep AR.js orientation/canvas in sync with current viewport aspect
+                    arToolkitContext.arController.orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
                 }
             } else {
                 renderer.setSize(window.innerWidth, window.innerHeight);
             }
 
             composer.setSize(renderer.domElement.width, renderer.domElement.height);
+
+            // Refresh projection to avoid aspect mismatch distortions
+            if (arToolkitContext) {
+                camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+            }
+
+            applyContentScale();
 
         }
 
