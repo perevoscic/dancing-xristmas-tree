@@ -22,7 +22,7 @@
 
         /* AR Camera Feed */
 
-        #ar-video {
+        #ar-video, .arjs-video {
             position: fixed;
             top: 0;
             left: 0;
@@ -204,31 +204,50 @@
 
         @keyframes load { 100% { width: 100%; } }
 
+        /* Status Bar */
+        #status-bar {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 16px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            border-radius: 4px;
+            z-index: 9;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
+            backdrop-filter: blur(6px);
+        }
+
     </style>
 
 
 
-    <!-- Three.js Core -->
+    <!-- Three.js Core (r110, compatible with AR.js 3.x) -->
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.110.0/build/three.min.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-
+    <!-- AR.js (local first; CDN fallback handled in code) -->
+    <script src="./ar.js"></script>
+    
     
 
     <!-- Post Processing Dependencies (Required for Glow/Bloom) -->
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.110.0/examples/js/shaders/CopyShader.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.110.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.110.0/examples/js/postprocessing/EffectComposer.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.110.0/examples/js/postprocessing/ShaderPass.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.110.0/examples/js/postprocessing/RenderPass.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.110.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 
 </head>
 
@@ -236,17 +255,16 @@
 
 
 
-    <video id="ar-video" playsinline muted autoplay></video>
-
     <div id="canvas-container"></div>
 
+    <div id="status-bar"><span id="status-text">Initializing camera...</span></div>
 
 
     <div id="loader">
 
         <div style="font-size: 3rem;">❄️</div>
 
-        <div class="terminal-text">>> INITIALIZING HOLIDAY PROTOCOLS...</div>
+        <div class="terminal-text">>> INITIALIZING AR MARKER PIPELINE...</div>
 
         <div class="progress-container"><div class="progress-bar"></div></div>
 
@@ -257,8 +275,7 @@
     <div id="ui-layer">
 
         <button class="hud-btn" id="toggle-dance">Toggle Dance</button>
-
-        <button class="hud-btn" id="reset-cam">Reset View</button>
+        <button class="hud-btn" id="reset-pose">Reset Position</button>
 
     </div>
 
@@ -275,7 +292,10 @@
             isDancing: true,
 
 
-            bloomThreshold: 0.1
+            bloomThreshold: 0.1,
+            bloomStrength: 1.4,
+            bloomRadius: 0.25,
+            baseScale: 0.18
 
         };
 
@@ -283,13 +303,59 @@
 
         // --- Globals ---
 
-        let scene, camera, renderer, composer, controls;
+        let scene, camera, renderer, composer;
 
-        let treeGroup, binarySnowSystem, videoTexture;
+        let treeGroup, binarySnowSystem;
+        let arToolkitSource, arToolkitContext, markerRoot, contentRoot;
+        let markerVisibleLast = false;
 
         let clock = new THREE.Clock();
 
-        const videoElement = document.getElementById('ar-video');
+        const statusText = document.getElementById('status-text');
+        const loaderEl = document.getElementById('loader');
+
+
+
+        // --- AR.js Loader ---
+
+        const arScriptCandidates = [
+            // Local first (best when offline / behind firewall)
+            './ar.js',
+            './libs/ar.js',
+            '/ar.js',
+            '/libs/ar.js',
+            // CDN fallbacks (3.3.2 mirrors)
+            'https://unpkg.com/@ar-js-org/ar.js@3.3.2/three.js/build/ar.js',
+            'https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/3.3.2/three.js/build/ar.js',
+            'https://raw.githack.com/AR-js-org/AR.js/3.3.2/three.js/build/ar.js'
+        ];
+
+        function loadScript(url) {
+            return new Promise((resolve, reject) => {
+                const tag = document.createElement('script');
+                tag.src = url;
+                tag.async = true;
+                tag.onload = resolve;
+                tag.onerror = () => reject(new Error('Failed to load ' + url));
+                document.head.appendChild(tag);
+            });
+        }
+
+        async function ensureARLoaded() {
+            if (window.THREEx && THREEx.ArToolkitSource) return;
+            setStatus('Loading AR.js...');
+            let lastErr;
+            for (const url of arScriptCandidates) {
+                try {
+                    await loadScript(url);
+                    if (window.THREEx && THREEx.ArToolkitSource) return;
+                } catch (err) {
+                    lastErr = err;
+                    console.warn('[AR] load attempt failed', url, err);
+                }
+            }
+            throw lastErr || new Error('AR.js not available');
+        }
 
 
 
@@ -300,11 +366,10 @@
             scene = new THREE.Scene();
             
 
-            // Camera setup for "Hero Shot"
+            // Camera driven by AR.js (projection set after ARToolkit init)
 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-
-            camera.position.set(0, 2.5, 9); // Pulled back to fit everything
+            camera = new THREE.Camera();
+            scene.add(camera);
 
 
 
@@ -387,25 +452,24 @@
 
 
 
-            // 5. Build The Masterpiece
+            // 5. AR marker tracking setup
+
+            setupARTracking();
+
+
+
+            // 6. Build The Masterpiece anchored to the marker
 
             buildTree();
 
             buildBinarySnow();
 
-
-
-            // 6. Controls
-
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-
-            controls.enableDamping = true;
-
-            controls.dampingFactor = 0.05;
-
-            controls.maxPolarAngle = Math.PI / 1.5; // Prevent going underground
-
-            controls.target.set(0, 2.5, 0);
+            const targetRoot = contentRoot || markerRoot || scene;
+            targetRoot.add(treeGroup);
+            targetRoot.add(binarySnowSystem);
+            targetRoot.scale.setScalar(config.baseScale);
+            targetRoot.position.set(0, 0, 0);
+            targetRoot.rotation.set(0, 0, 0);
 
 
 
@@ -414,20 +478,11 @@
             window.addEventListener('resize', onResize);
 
             document.getElementById('toggle-dance').addEventListener('click', () => config.isDancing = !config.isDancing);
-
-            document.getElementById('reset-cam').addEventListener('click', () => {
-
-                camera.position.set(0, 2.5, 9);
-
-                controls.target.set(0, 2.5, 0);
-
-            });
+            document.getElementById('reset-pose').addEventListener('click', resetPose);
 
 
 
-            // 8. Start AR & Animation
-
-            startCamera();
+            // 8. Start Animation
 
             animate();
 
@@ -435,14 +490,19 @@
 
             // Hide Loader
 
-            setTimeout(() => {
+            setTimeout(() => hideLoader(), 1500);
 
-                document.getElementById('loader').style.opacity = 0;
+        }
 
-                setTimeout(() => document.getElementById('loader').remove(), 800);
 
-            }, 2000);
-
+        function resetPose() {
+            if (contentRoot) {
+                contentRoot.position.set(0, 0, 0);
+                contentRoot.rotation.set(0, 0, 0);
+                contentRoot.scale.setScalar(config.baseScale);
+            }
+            if (treeGroup) treeGroup.position.set(0, 0, 0);
+            if (binarySnowSystem) binarySnowSystem.position.set(0, 0, 0);
         }
 
 
@@ -572,7 +632,8 @@
 
 
 
-            scene.add(treeGroup);
+            const parent = contentRoot || markerRoot || scene;
+            parent.add(treeGroup);
 
         }
 
@@ -958,52 +1019,122 @@
 
             binarySnowSystem = new THREE.Points(geometry, material);
 
-            scene.add(binarySnowSystem);
+            const parent = contentRoot || markerRoot || scene;
+            parent.add(binarySnowSystem);
 
         }
 
 
 
-        // --- AR Camera ---
+        // --- AR.js Tracking + UI helpers ---
 
-        async function startCamera() {
+        function setStatus(message) {
+            if (statusText) statusText.textContent = message;
+        }
 
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        function setErrorStatus(message, err) {
+            if (err) console.error('[AR]', message, err);
+            else console.error('[AR]', message);
+            setStatus(message);
+        }
 
-                try {
 
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
+        function hideLoader() {
+            if (!loaderEl) return;
+            loaderEl.style.opacity = 0;
+            setTimeout(() => loaderEl.remove(), 800);
+        }
 
-                        video: { facingMode: 'environment' } 
 
-                    });
+        function attachARVideo() {
+            const video = arToolkitSource.domElement;
+            if (!video) return;
+            video.setAttribute('id', 'ar-video');
+            video.setAttribute('playsinline', 'true');
+            video.setAttribute('autoplay', 'true');
+            video.setAttribute('muted', 'true');
+            video.muted = true;
+            video.style.position = 'fixed';
+            video.style.top = '0';
+            video.style.left = '0';
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.style.objectFit = 'cover';
+            video.style.transform = 'scaleX(-1)';
+            video.style.zIndex = 0;
+            document.body.insertBefore(video, document.getElementById('canvas-container'));
+        }
 
-                    videoElement.srcObject = stream;
 
-                    videoElement.onloadedmetadata = async () => {
+        function setupARTracking() {
 
-                        try { await videoElement.play(); } catch (_) {}
-
-                        videoElement.style.display = 'block';
-                        videoElement.style.visibility = 'visible';
-
-                        // Bind the video as a background texture so it always shows behind the tree
-                        videoTexture = new THREE.VideoTexture(videoElement);
-                        videoTexture.minFilter = THREE.LinearFilter;
-                        videoTexture.magFilter = THREE.LinearFilter;
-                        videoTexture.format = THREE.RGBFormat;
-                        videoTexture.encoding = THREE.sRGBEncoding;
-                        scene.background = videoTexture;
-                    };
-
-                } catch (e) {
-                    // If camera fails, leave background transparent
-                }
-
-            } else {
-                // No media devices; keep transparent canvas
+            if (!window.THREEx || !THREEx.ArToolkitSource || !THREEx.ArToolkitContext) {
+                setErrorStatus('AR.js failed to load. Check network/console.');
+                hideLoader();
+                return;
             }
 
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setErrorStatus('Camera APIs unavailable in this browser/page.');
+                hideLoader();
+                return;
+            }
+
+            setStatus('Requesting camera access...');
+
+            try {
+                arToolkitSource = new THREEx.ArToolkitSource({
+                    sourceType: 'webcam',
+                    sourceWidth: 1280,
+                    sourceHeight: 720
+                });
+
+                arToolkitSource.init(() => {
+                    attachARVideo();
+                    onResize();
+                    hideLoader();
+                    setStatus('Point at pattern-2.png');
+                });
+
+                // If init never fires (e.g., permission blocked), fall back with a hint
+                setTimeout(() => {
+                    if (!arToolkitSource || !arToolkitSource.ready) {
+                        setErrorStatus('Camera blocked or unavailable. Allow access and reload.');
+                        hideLoader();
+                    }
+                }, 5000);
+
+            arToolkitContext = new THREEx.ArToolkitContext({
+                cameraParametersUrl: './camera_para.dat',
+                detectionMode: 'mono',
+                maxDetectionRate: 30
+            });
+
+                arToolkitContext.init(() => {
+                    camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+                });
+
+                markerRoot = new THREE.Group();
+                markerRoot.matrixAutoUpdate = false;
+                markerRoot.visible = false;
+                scene.add(markerRoot);
+
+                contentRoot = new THREE.Group();
+                markerRoot.add(contentRoot);
+
+                new THREEx.ArMarkerControls(arToolkitContext, markerRoot, {
+                    type: 'pattern',
+                    patternUrl: 'pattern-2.patt',
+                    changeMatrixMode: 'modelViewMatrix'
+                });
+
+                // Safety net to hide loader even if init is slow
+                setTimeout(hideLoader, 3500);
+
+            } catch (err) {
+                setErrorStatus('AR init failed. See console.', err);
+                hideLoader();
+            }
         }
 
 
@@ -1012,13 +1143,17 @@
 
         function onResize() {
 
-            camera.aspect = window.innerWidth / window.innerHeight;
+            if (arToolkitSource) {
+                arToolkitSource.onResizeElement();
+                arToolkitSource.copyElementSizeTo(renderer.domElement);
+                if (arToolkitContext && arToolkitContext.arController !== null) {
+                    arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
+                }
+            } else {
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
 
-            camera.updateProjectionMatrix();
-
-            renderer.setSize(window.innerWidth, window.innerHeight);
-
-            composer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(renderer.domElement.width, renderer.domElement.height);
 
         }
 
@@ -1032,11 +1167,25 @@
 
 
 
+            if (arToolkitSource && arToolkitSource.ready) {
+                arToolkitContext.update(arToolkitSource.domElement);
+
+                if (markerRoot) {
+                    const visible = markerRoot.visible;
+                    if (visible !== markerVisibleLast) {
+                        markerVisibleLast = visible;
+                        setStatus(visible ? 'Marker locked ✅' : 'Point at pattern-2.png');
+                    }
+                }
+            }
+
+
+
             const time = clock.getElapsedTime();
 
 
 
-            if (treeGroup && config.isDancing) {
+            if (treeGroup && config.isDancing && (!markerRoot || markerRoot.visible)) {
 
                 // Smooth bounce
 
@@ -1099,9 +1248,6 @@
 
 
 
-            controls.update();
-            
-
             // Render via Composer (Bloom) instead of plain renderer
 
             composer.render();
@@ -1110,7 +1256,9 @@
 
 
 
-        init();
+        ensureARLoaded()
+            .then(() => init())
+            .catch(err => setErrorStatus('AR.js failed to load. Check network/console.', err));
 
     </script>
 
