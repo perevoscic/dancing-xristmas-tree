@@ -1,331 +1,1120 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
+
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>AR Dancing Christmas Tree</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background-color: #1a1a1a;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    #ar-video {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      z-index: 0;
-      display: none;
-    }
-    #canvas-container {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-      pointer-events: auto;
-    }
-    #ui-layer {
-      position: fixed;
-      bottom: 20px;
-      left: 0;
-      width: 100%;
-      z-index: 2;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 10px;
-      pointer-events: none;
-    }
-    button {
-      pointer-events: auto;
-      background: rgba(255, 255, 255, 0.9);
-      border: none;
-      border-radius: 30px;
-      padding: 12px 24px;
-      font-weight: bold;
-      color: #333;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
-      cursor: pointer;
-      transition: transform 0.1s, background 0.2s;
-      font-size: 1rem;
-    }
-    button:active { transform: scale(0.95); }
-    button.primary { background: #ff4757; color: white; }
-    #loading {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: white;
-      z-index: 3;
-      font-size: 1.2rem;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-      pointer-events: none;
-      transition: opacity 0.5s;
-    }
-    #error-msg {
-      display: none;
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255, 0, 0, 0.8);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
-      z-index: 10;
-      font-size: 0.9rem;
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-</head>
-<body>
-  <video id="ar-video" playsinline muted autoplay></video>
-  <div id="canvas-container"></div>
-  <div id="loading">Initializing AR Tree...</div>
-  <div id="error-msg">Camera unavailable. Using Snow Mode.</div>
-  <div id="ui-layer">
-    <button id="toggle-dance" class="primary">Stop Dancing</button>
-    <button id="reset-cam">Reset View</button>
-  </div>
 
-  <script>
-    const config = { danceSpeed: 3.5, danceAmplitude: 0.15, treeHeight: 3, isDancing: true };
-    let scene, camera, renderer, controls, treeGroup;
-    const clock = new THREE.Clock();
-    const videoElement = document.getElementById('ar-video');
-    const loadingElement = document.getElementById('loading');
-    const errorElement = document.getElementById('error-msg');
+    <meta charset="UTF-8">
 
-    function init() {
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(0, 1.5, 5);
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 
-      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
-      document.getElementById('canvas-container').appendChild(renderer.domElement);
+    <title>Ultimate IT Christmas Tree</title>
 
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-      scene.add(ambientLight);
-      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      dirLight.position.set(5, 10, 7);
-      scene.add(dirLight);
+    <style>
 
-      createProceduralTree();
-
-      controls = new THREE.OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.05;
-      controls.target.set(0, 1.5, 0);
-
-      window.addEventListener('resize', onWindowResize, false);
-      document.getElementById('toggle-dance').addEventListener('click', toggleDance);
-      document.getElementById('reset-cam').addEventListener('click', () => {
-        camera.position.set(0, 1.5, 5);
-        controls.target.set(0, 1.5, 0);
-      });
-
-      startCamera();
-      animate();
-    }
-
-    function createProceduralTree() {
-      treeGroup = new THREE.Group();
-
-      const leafMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.8, flatShading: true });
-      const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a3e2b, roughness: 1 });
-      const starMat = new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, emissiveIntensity: 0.5, roughness: 0.2, metalness: 0.8 });
-
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 1.5, 8), trunkMat);
-      trunk.position.y = 0.75;
-      treeGroup.add(trunk);
-
-      const levels = 3;
-      for (let i = 0; i < levels; i++) {
-        const bottomRadius = 2.0 - (i * 0.5);
-        const height = 1.8;
-        const yPos = 1.5 + (i * 1.2);
-        const cone = new THREE.Mesh(new THREE.ConeGeometry(bottomRadius, height, 16), leafMat);
-        cone.position.y = yPos;
-        addOrnaments(cone, bottomRadius, height);
-        treeGroup.add(cone);
-      }
-
-      const star = new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), starMat);
-      star.position.y = 1.5 + ((levels - 1) * 1.2) + 0.8;
-      const starLight = new THREE.PointLight(0xffaa00, 1, 5);
-      star.add(starLight);
-      treeGroup.add(star);
-
-      addGreetingText();
-      treeGroup.position.set(0, -0.5, -3);
-      scene.add(treeGroup);
-    }
-
-    function addGreetingText() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1024;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = 'rgba(0,0,0,0)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.shadowColor = '#ff0000';
-      ctx.shadowBlur = 15;
-      ctx.fillStyle = '#ffcccc';
-      ctx.font = 'bold 90px Arial';
-      ctx.fillText('Merry Christmas', 512, 200);
-      ctx.font = 'bold 70px Arial';
-      ctx.fillText('from HSB IT dept', 512, 320);
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 1 });
-      const sprite = new THREE.Sprite(material);
-      sprite.scale.set(3.5, 1.75, 1);
-      sprite.position.set(0, 2.5, 1.8);
-      treeGroup.userData.greeting = sprite;
-      treeGroup.add(sprite);
-    }
-
-    function addOrnaments(coneMesh, radius, height) {
-      const count = 30;
-      for (let i = 0; i < count; i++) {
-        const type = Math.random();
-        let mesh;
-        if (type < 0.25) mesh = createFloppy();
-        else if (type < 0.5) mesh = createUSB();
-        else if (type < 0.75) mesh = createCD();
-        else mesh = createMouse();
-
-        const angle = (i / count) * Math.PI * 2 + Math.random();
-        const yOffset = -height / 3 + (Math.random() * 0.8 - 0.4);
-        const r = radius * (0.65 + Math.random() * 0.25);
-        mesh.position.set(Math.cos(angle) * r, yOffset, Math.sin(angle) * r);
-        mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-        coneMesh.add(mesh);
-      }
-    }
-
-    function createFloppy() {
-      const group = new THREE.Group();
-      const colors = [0x0000ff, 0x333333, 0xf5f5dc];
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.03), new THREE.MeshStandardMaterial({ color }));
-      const shutter = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.2, 0.035), new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.8, roughness: 0.2 }));
-      shutter.position.set(0, 0.08, 0);
-      group.add(body);
-      group.add(shutter);
-      return group;
-    }
-
-    function createUSB() {
-      const group = new THREE.Group();
-      const body = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.25, 0.05), new THREE.MeshStandardMaterial({ color: 0xff4444 }));
-      const tip = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.04), new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.9 }));
-      tip.position.y = 0.17;
-      group.add(body);
-      group.add(tip);
-      return group;
-    }
-
-    function createCD() {
-      return new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.01, 32), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.9, roughness: 0.1, emissive: 0x222222 }));
-    }
-
-    function createMouse() {
-      const mouse = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16).scale(1, 0.6, 1.5), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3), new THREE.MeshBasicMaterial({ color: 0x333333 }));
-      tail.position.z = -0.2;
-      tail.rotation.x = Math.PI / 2;
-      mouse.add(tail);
-      return mouse;
-    }
-
-    async function startCamera() {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-          });
-          videoElement.srcObject = stream;
-          videoElement.onloadedmetadata = () => {
-            videoElement.play();
-            videoElement.style.display = 'block';
-            loadingElement.style.opacity = 0;
-          };
-        } catch (err) {
-          console.error('Camera failed:', err);
-          handleCameraError();
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
         }
-      } else {
-        handleCameraError();
-      }
-    }
 
-    function handleCameraError() {
-      loadingElement.style.opacity = 0;
-      errorElement.style.display = 'block';
-      scene.background = new THREE.Color(0x050510);
-      const particleCount = 1000;
-      const geom = new THREE.BufferGeometry();
-      const positions = [];
-      for (let i = 0; i < particleCount; i++) {
-        positions.push((Math.random() - 0.5) * 50, (Math.random() - 0.5) * 50, (Math.random() - 0.5) * 50);
-      }
-      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2 });
-      scene.add(new THREE.Points(geom, mat));
-    }
 
-    function toggleDance() {
-      config.isDancing = !config.isDancing;
-      const btn = document.getElementById('toggle-dance');
-      btn.textContent = config.isDancing ? 'Stop Dancing' : 'Dance!';
-      btn.className = config.isDancing ? 'primary' : '';
-    }
 
-    function onWindowResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
+        /* AR Camera Feed */
 
-    function animate() {
-      requestAnimationFrame(animate);
-      const time = clock.getElapsedTime();
-      if (treeGroup && config.isDancing) {
-        const rhythm = Math.sin(time * config.danceSpeed);
-        const bend = Math.cos(time * config.danceSpeed);
-        const scaleY = 1 + (rhythm * 0.05);
-        const scaleXZ = 1 - (rhythm * 0.02);
-        treeGroup.scale.set(scaleXZ, scaleY, scaleXZ);
-        treeGroup.rotation.z = bend * 0.1;
-        treeGroup.rotation.x = Math.sin(time * config.danceSpeed * 0.5) * 0.05;
-      } else if (treeGroup) {
-        treeGroup.scale.lerp(new THREE.Vector3(1, 1, 1), 0.1);
-        treeGroup.rotation.z = THREE.MathUtils.lerp(treeGroup.rotation.z, 0, 0.1);
-        treeGroup.rotation.x = THREE.MathUtils.lerp(treeGroup.rotation.x, 0, 0.1);
-      }
-      if (treeGroup && treeGroup.userData.greeting) {
-        const flash = Math.sin(time * 6) * 0.3 + 0.7;
-        treeGroup.userData.greeting.material.opacity = flash;
-        const scalePulse = 1 + Math.sin(time * 6) * 0.05;
-        treeGroup.userData.greeting.scale.set(3.5 * scalePulse, 1.75 * scalePulse, 1);
-      }
-      controls.update();
-      renderer.render(scene, camera);
-    }
+        #ar-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            display: block;
+            transform: scaleX(-1);
+            filter: brightness(0.8); /* Darken reality slightly to make holograms pop */
+        }
 
-    init();
-  </script>
+
+
+        #canvas-container {
+
+            position: fixed;
+
+            top: 0;
+
+            left: 0;
+
+            width: 100%;
+
+            height: 100%;
+
+            z-index: 1;
+
+        }
+
+
+
+        /* HUD Overlay */
+
+        #ui-layer {
+
+            position: fixed;
+
+            bottom: 30px;
+
+            width: 100%;
+            z-index: 10;
+            display: flex;
+            justify-content: center;
+
+            gap: 20px;
+
+            pointer-events: none;
+
+        }
+
+
+
+        .hud-btn {
+
+            pointer-events: auto;
+
+            background: rgba(0, 20, 0, 0.6);
+
+            border: 1px solid #00ff41;
+
+            color: #00ff41;
+
+            padding: 12px 24px;
+
+            border-radius: 4px;
+
+            font-weight: bold;
+
+            text-transform: uppercase;
+
+            letter-spacing: 2px;
+
+            cursor: pointer;
+
+            backdrop-filter: blur(4px);
+
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.2);
+
+            transition: all 0.3s ease;
+
+        }
+
+
+
+        .hud-btn:hover {
+
+            background: rgba(0, 255, 65, 0.2);
+
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.6);
+
+            text-shadow: 0 0 5px #00ff41;
+
+        }
+
+
+
+        /* Loading Screen */
+
+        #loader {
+
+            position: fixed;
+
+            top: 0;
+
+            left: 0;
+
+            width: 100%;
+
+            height: 100%;
+
+            background: #000;
+
+            z-index: 20;
+
+            display: flex;
+
+            flex-direction: column;
+
+            justify-content: center;
+
+            align-items: center;
+
+            color: #00ff41;
+
+            transition: opacity 0.8s ease-out;
+
+        }
+
+
+
+        .terminal-text {
+
+            font-size: 1.2rem;
+
+            margin-top: 15px;
+
+            animation: blink 1s infinite;
+
+        }
+
+
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+
+
+        /* Progress Bar */
+
+        .progress-container {
+
+            width: 200px;
+
+            height: 4px;
+
+            background: #111;
+
+            margin-top: 20px;
+
+            border-radius: 2px;
+
+            overflow: hidden;
+
+        }
+
+        .progress-bar {
+
+            width: 0%;
+
+            height: 100%;
+
+            background: #00ff41;
+
+            box-shadow: 0 0 10px #00ff41;
+
+            animation: load 2s ease-out forwards;
+
+        }
+
+        @keyframes load { 100% { width: 100%; } }
+
+    </style>
+
+
+
+    <!-- Three.js Core -->
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    
+
+    <!-- Post Processing Dependencies (Required for Glow/Bloom) -->
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+</head>
+
+<body>
+
+
+
+    <video id="ar-video" playsinline muted autoplay></video>
+
+    <div id="canvas-container"></div>
+
+
+
+    <div id="loader">
+
+        <div style="font-size: 3rem;">❄️</div>
+
+        <div class="terminal-text">>> INITIALIZING HOLIDAY PROTOCOLS...</div>
+
+        <div class="progress-container"><div class="progress-bar"></div></div>
+
+    </div>
+
+
+
+    <div id="ui-layer">
+
+        <button class="hud-btn" id="toggle-dance">Toggle Dance</button>
+
+        <button class="hud-btn" id="reset-cam">Reset View</button>
+
+    </div>
+
+
+
+    <script>
+
+        // --- System Config ---
+
+        const config = {
+
+            danceSpeed: 2.5,
+
+            isDancing: true,
+
+
+            bloomThreshold: 0.1
+
+        };
+
+
+
+        // --- Globals ---
+
+        let scene, camera, renderer, composer, controls;
+
+        let treeGroup, binarySnowSystem, videoTexture;
+
+        let clock = new THREE.Clock();
+
+        const videoElement = document.getElementById('ar-video');
+
+
+
+        function init() {
+
+            // 1. Scene Setup
+
+            scene = new THREE.Scene();
+            
+
+            // Camera setup for "Hero Shot"
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+
+            camera.position.set(0, 2.5, 9); // Pulled back to fit everything
+
+
+
+            // 2. Renderer with High Performance settings
+
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap pixel ratio for performance
+
+            renderer.toneMapping = THREE.ReinhardToneMapping;
+
+            renderer.setClearColor(0x000000, 0); // Keep canvas transparent so video shows through
+
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+
+
+            // 3. Post-Processing (BLOOM)
+
+            const renderScene = new THREE.RenderPass(scene, camera);
+            
+
+            // Bloom Pass parameters: resolution, strength, radius, threshold
+
+            const bloomPass = new THREE.UnrealBloomPass(
+
+                new THREE.Vector2(window.innerWidth, window.innerHeight), 
+
+                config.bloomStrength, 
+
+                config.bloomRadius, 
+
+                config.bloomThreshold
+
+            );
+
+
+
+            composer = new THREE.EffectComposer(renderer);
+
+            composer.addPass(renderScene);
+
+            composer.addPass(bloomPass);
+
+
+
+            // 4. Lighting (Dramatic)
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.1); // Low ambient to let emissive pop
+
+            scene.add(ambient);
+
+
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1);
+
+            keyLight.position.set(5, 5, 5);
+
+            scene.add(keyLight);
+
+
+
+            // Cyberpunk rim lights
+
+            const blueRim = new THREE.PointLight(0x0088ff, 2, 20);
+
+            blueRim.position.set(-5, 2, 2);
+
+            scene.add(blueRim);
+
+
+
+            const greenRim = new THREE.PointLight(0x00ff41, 1, 20);
+
+            greenRim.position.set(5, 0, 2);
+
+            scene.add(greenRim);
+
+
+
+            // 5. Build The Masterpiece
+
+            buildTree();
+
+            buildBinarySnow();
+
+
+
+            // 6. Controls
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+            controls.enableDamping = true;
+
+            controls.dampingFactor = 0.05;
+
+            controls.maxPolarAngle = Math.PI / 1.5; // Prevent going underground
+
+            controls.target.set(0, 2.5, 0);
+
+
+
+            // 7. Listeners
+
+            window.addEventListener('resize', onResize);
+
+            document.getElementById('toggle-dance').addEventListener('click', () => config.isDancing = !config.isDancing);
+
+            document.getElementById('reset-cam').addEventListener('click', () => {
+
+                camera.position.set(0, 2.5, 9);
+
+                controls.target.set(0, 2.5, 0);
+
+            });
+
+
+
+            // 8. Start AR & Animation
+
+            startCamera();
+
+            animate();
+
+
+
+            // Hide Loader
+
+            setTimeout(() => {
+
+                document.getElementById('loader').style.opacity = 0;
+
+                setTimeout(() => document.getElementById('loader').remove(), 800);
+
+            }, 2000);
+
+        }
+
+
+
+        // --- The Tree Construction ---
+
+        function buildTree() {
+
+            treeGroup = new THREE.Group();
+
+
+
+            // Materials - High Quality
+
+            const leafMat = new THREE.MeshStandardMaterial({ 
+
+                color: 0x0f4d0f, 
+
+                roughness: 0.4, 
+
+                metalness: 0.3 
+
+            });
+
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3d2817, roughness: 0.9 });
+
+
+
+            // Trunk
+
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2, 16), trunkMat);
+
+            trunk.position.y = 1;
+
+            treeGroup.add(trunk);
+
+
+
+            // Layers
+
+            const layers = 6;
+
+            for(let i=0; i<layers; i++) {
+
+                const t = i / layers;
+
+                const r = 2.8 * (1 - t * 0.85);
+
+                const h = 1.5;
+
+                const y = 1.8 + (i * 0.9);
+
+
+
+                const cone = new THREE.Mesh(new THREE.ConeGeometry(r, h, 32), leafMat);
+
+                cone.position.y = y;
+
+                treeGroup.add(cone);
+
+
+
+                // Add Decorations
+
+                addITOrnaments(cone, r, h);
+
+                addGlowingLights(cone, r, h);
+
+            }
+
+
+
+            // Topper: The "CPU" Star
+
+            const starGroup = new THREE.Group();
+
+            const starGeo = new THREE.IcosahedronGeometry(0.5, 0);
+
+            const starMat = new THREE.MeshStandardMaterial({ 
+
+                color: 0xffd700, 
+
+                emissive: 0xffaa00, 
+
+                emissiveIntensity: 2.0, // Glows brightly
+
+                roughness: 0.1,
+
+                metalness: 1.0
+
+            });
+
+            const star = new THREE.Mesh(starGeo, starMat);
+
+            starGroup.position.y = 1.8 + ((layers-1) * 0.9) + 0.8;
+
+            starGroup.add(star);
+            
+
+            // Orbiting Electrons for Star
+
+            for(let i=0; i<3; i++) {
+
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.02, 8, 32), new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.6 }));
+
+                ring.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+
+                starGroup.add(ring);
+
+            }
+
+            treeGroup.add(starGroup);
+
+            treeGroup.userData.star = starGroup;
+
+
+
+            // Holographic Sign (Frontmost)
+
+            addHologramSign();
+
+
+
+            // Gifts
+
+            addGifts();
+
+
+
+            scene.add(treeGroup);
+
+        }
+
+
+
+        // --- Ornaments: IT Hardware ---
+
+        function addITOrnaments(parent, r, h) {
+
+            const count = 10;
+
+            for(let i=0; i<count; i++) {
+
+                let mesh;
+
+                const type = Math.random();
+
+                if(type < 0.3) mesh = createFloppy();
+
+                else if(type < 0.6) mesh = createUSB();
+
+                else if(type < 0.8) mesh = createRamStick();
+
+                else mesh = createMouse();
+
+
+
+                const angle = Math.random() * Math.PI * 2;
+
+                const rad = r * 0.75;
+
+                const y = -h * 0.3 + (Math.random() * 0.4 - 0.2);
+
+
+
+                mesh.position.set(Math.cos(angle)*rad, y, Math.sin(angle)*rad);
+
+                mesh.rotation.set(Math.random(), Math.random(), Math.random());
+
+                mesh.scale.setScalar(0.7);
+
+                parent.add(mesh);
+
+            }
+
+        }
+
+
+
+        // --- Lights: Emissive for Bloom ---
+
+        function addGlowingLights(parent, r, h) {
+
+            const count = 18;
+
+            const colors = [0xff0000, 0x00ff00, 0x0088ff, 0xffaa00, 0xff00ff];
+
+            const geo = new THREE.SphereGeometry(0.08, 16, 16);
+
+
+
+            for(let i=0; i<count; i++) {
+
+                const color = colors[Math.floor(Math.random() * colors.length)];
+
+                // EmissiveIntensity > 1 triggers the bloom effect
+
+                const mat = new THREE.MeshStandardMaterial({ 
+
+                    color: 0x000000, 
+
+                    emissive: color, 
+
+                    emissiveIntensity: 3.0 
+
+                });
+
+                const mesh = new THREE.Mesh(geo, mat);
+
+
+
+                const angle = Math.random() * Math.PI * 2;
+
+                // Distribute slightly outside the leaves
+
+                const y = -h * Math.random() * 0.8;
+
+                const slopeRadius = r * (1 - (Math.abs(y)/h)) + 0.1;
+
+
+
+                mesh.position.set(Math.cos(angle)*slopeRadius, y, Math.sin(angle)*slopeRadius);
+
+                parent.add(mesh);
+
+            }
+
+        }
+
+
+
+        // --- Hardware Creators ---
+
+        function createFloppy() {
+
+            const g = new THREE.Group();
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.05), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+
+            const shutter = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.3, 0.06), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8 }));
+
+            shutter.position.y = 0.1;
+
+            g.add(body, shutter);
+
+            return g;
+
+        }
+
+        function createUSB() {
+
+            const g = new THREE.Group();
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.4, 0.08), new THREE.MeshStandardMaterial({ color: 0xff3333 }));
+
+            const tip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.06), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 }));
+
+            tip.position.y = 0.27;
+
+            g.add(body, tip);
+
+            return g;
+
+        }
+
+        function createRamStick() {
+
+            const g = new THREE.Group();
+
+            const pcb = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.15, 0.02), new THREE.MeshStandardMaterial({ color: 0x00aa00 }));
+
+            const chips = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.04), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+
+            g.add(pcb, chips);
+
+            return g;
+
+        }
+
+        function createMouse() {
+
+             const m = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+
+             m.scale.set(1, 0.6, 1.4);
+
+             const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.3), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+
+             cord.position.z = -0.2;
+
+             cord.rotation.x = Math.PI/2;
+
+             m.add(cord);
+
+             return m;
+
+        }
+
+
+
+        // --- Hologram Sign ---
+
+        function addHologramSign() {
+
+            const canvas = document.createElement('canvas');
+
+            canvas.width = 1024;
+
+            canvas.height = 512;
+
+            const ctx = canvas.getContext('2d');
+
+
+
+            // Draw Neon Text
+
+            ctx.fillStyle = "rgba(0,0,0,0)";
+
+            ctx.clearRect(0,0,1024,512);
+            
+
+            ctx.shadowColor = "#00ff41";
+
+            ctx.shadowBlur = 30;
+
+            ctx.fillStyle = "#ffffff";
+
+            ctx.textAlign = "center";
+
+            ctx.font = "bold 90px Courier New";
+
+            ctx.fillText("MERRY CHRISTMAS", 512, 200);
+            
+
+            ctx.shadowColor = "#0088ff";
+
+            ctx.font = "bold 70px Courier New";
+
+            ctx.fillText("FROM HSB IT DEPT", 512, 320);
+
+
+
+            // Scanlines
+
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+
+            for(let i=0; i<512; i+=6) ctx.fillRect(0,i,1024,2);
+
+
+
+            const tex = new THREE.CanvasTexture(canvas);
+
+            const mat = new THREE.SpriteMaterial({ 
+
+                map: tex, 
+
+                transparent: true, 
+
+                opacity: 0.95,
+
+                blending: THREE.AdditiveBlending,
+
+                depthTest: false // Always show on top
+
+            });
+
+
+
+            const sprite = new THREE.Sprite(mat);
+
+            sprite.scale.set(6, 3, 1);
+
+            sprite.position.set(0, 3.5, 3.0); // Front and Center
+
+            sprite.renderOrder = 999;
+
+            treeGroup.add(sprite);
+
+            treeGroup.userData.sign = sprite;
+
+        }
+
+
+
+        // --- Gifts ---
+
+        function addGifts() {
+
+            const group = new THREE.Group();
+
+            // Server Rack
+
+            const rack = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.8), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+
+            rack.position.set(-1.5, 0.2, 1.5);
+
+            // Emissive Lights on Rack
+
+            const leds = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.05, 0.82), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x00ff00, emissiveIntensity: 5 }));
+
+            rack.add(leds);
+
+            group.add(rack);
+
+
+
+            // PC Tower
+
+            const pc = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.9, 0.8), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+
+            pc.position.set(1.5, 0.45, 1.2);
+
+            // RGB Strip
+
+            const strip = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.8, 0.05), new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xff00ff, emissiveIntensity: 3 }));
+
+            strip.position.z = 0.38;
+
+            pc.add(strip);
+
+            group.add(pc);
+
+
+
+            // Laptops
+
+            for(let i=0; i<3; i++) {
+
+                const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+
+                const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.11, 0.61), new THREE.MeshStandardMaterial({ color: 0x0000ff }));
+
+                box.add(ribbon);
+
+                const a = Math.random() * Math.PI * 2;
+
+                const d = 2 + Math.random();
+
+                box.position.set(Math.cos(a)*d, 0.05, Math.sin(a)*d);
+
+                box.rotation.y = Math.random();
+
+                group.add(box);
+
+            }
+
+
+
+            treeGroup.add(group);
+
+        }
+
+
+
+        // --- Binary Snow System ---
+
+        function buildBinarySnow() {
+
+            const count = 1000;
+
+            const geometry = new THREE.BufferGeometry();
+
+            const positions = [];
+
+            const speeds = [];
+
+
+
+            for(let i=0; i<count; i++) {
+
+                positions.push(
+
+                    (Math.random() - 0.5) * 40,
+
+                    (Math.random() - 0.5) * 40 + 10,
+
+                    (Math.random() - 0.5) * 40
+
+                );
+
+                speeds.push(0.05 + Math.random() * 0.1);
+
+            }
+
+
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+            geometry.setAttribute('speed', new THREE.Float32BufferAttribute(speeds, 1));
+
+
+
+            // Use a simple point material for performance, but we simulate 0s and 1s via blinking in mind
+
+            // Ideally we'd use a texture atlas for '0' and '1', but for single-file, squares work as "bits"
+
+            const material = new THREE.PointsMaterial({
+
+                color: 0x00ff41,
+
+                size: 0.2,
+
+                transparent: true,
+
+                opacity: 0.8,
+
+                blending: THREE.AdditiveBlending
+
+            });
+
+
+
+            binarySnowSystem = new THREE.Points(geometry, material);
+
+            scene.add(binarySnowSystem);
+
+        }
+
+
+
+        // --- AR Camera ---
+
+        async function startCamera() {
+
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+
+                try {
+
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+
+                        video: { facingMode: 'environment' } 
+
+                    });
+
+                    videoElement.srcObject = stream;
+
+                    videoElement.onloadedmetadata = async () => {
+
+                        try { await videoElement.play(); } catch (_) {}
+
+                        videoElement.style.display = 'block';
+                        videoElement.style.visibility = 'visible';
+
+                        // Bind the video as a background texture so it always shows behind the tree
+                        videoTexture = new THREE.VideoTexture(videoElement);
+                        videoTexture.minFilter = THREE.LinearFilter;
+                        videoTexture.magFilter = THREE.LinearFilter;
+                        videoTexture.format = THREE.RGBFormat;
+                        videoTexture.encoding = THREE.sRGBEncoding;
+                        scene.background = videoTexture;
+                    };
+
+                } catch (e) {
+                    // If camera fails, leave background transparent
+                }
+
+            } else {
+                // No media devices; keep transparent canvas
+            }
+
+        }
+
+
+
+        // --- Interaction ---
+
+        function onResize() {
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            composer.setSize(window.innerWidth, window.innerHeight);
+
+        }
+
+
+
+        // --- Loop ---
+
+        function animate() {
+
+            requestAnimationFrame(animate);
+
+
+
+            const time = clock.getElapsedTime();
+
+
+
+            if (treeGroup && config.isDancing) {
+
+                // Smooth bounce
+
+                const bounce = Math.sin(time * config.danceSpeed) * 0.03;
+
+                treeGroup.scale.set(1 - bounce, 1 + bounce*2, 1 - bounce);
+                
+
+                // Gentle swaying
+
+                treeGroup.rotation.z = Math.cos(time * 2) * 0.02;
+                
+
+                // Rotate entire tree slowly for showcase
+
+                treeGroup.rotation.y = time * 0.2;
+
+
+
+                // Sign animation
+
+                if(treeGroup.userData.sign) {
+
+                    treeGroup.userData.sign.material.opacity = 0.8 + Math.sin(time * 10) * 0.2; // Glitch flicker
+
+                    // Counter-rotate sign so it always faces broadly front relative to tree spin
+
+                    // actually, simpler: just let it spin with tree but maybe pulse
+
+                }
+
+            }
+
+
+
+            // Animate Binary Snow
+
+            if (binarySnowSystem) {
+
+                const positions = binarySnowSystem.geometry.attributes.position.array;
+
+                const speeds = binarySnowSystem.geometry.attributes.speed.array;
+                
+
+                for(let i=0; i<speeds.length; i++) {
+
+                    positions[i*3 + 1] -= speeds[i]; // Move Y down
+
+                    if(positions[i*3 + 1] < -5) {
+
+                        positions[i*3 + 1] = 20; // Reset to top
+
+                    }
+
+                }
+
+                binarySnowSystem.geometry.attributes.position.needsUpdate = true;
+
+            }
+
+
+
+            controls.update();
+            
+
+            // Render via Composer (Bloom) instead of plain renderer
+
+            composer.render();
+
+        }
+
+
+
+        init();
+
+    </script>
+
 </body>
+
 </html>
+

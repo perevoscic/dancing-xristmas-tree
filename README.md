@@ -1,12 +1,12 @@
 # Dancing Xristmas Tree (Web AR)
 
-Open `index.html` through a local server to see a marker-based AR Christmas tree built with A-Frame + AR.js.
+Open `index.html` through a local server to see a marker-based AR Christmas tree built with three.js + AR.js.
 
 ## Quick start
 - Install any static server (if you have Node): `npx serve .`
 - Or with Python: `python -m http.server 8080`
 - Visit the served URL on your phone; allow camera access.
-- Point the camera at a Hiro marker: https://raw.githubusercontent.com/AR-js-org/AR.js/master/aframe/examples/marker-training/examples/hiro.png (print it or show it on another screen).
+- Point the camera at `pattern-2.png` (print it or show it on another screen). The matching tracker file is `pattern-2.patt`.
 
 You should see a blinking, gift-wrapped tree sitting on the marker.
 
@@ -19,5 +19,5 @@ You should see a blinking, gift-wrapped tree sitting on the marker.
 
 ## Using your custom marker
 - Pattern file: `pattern-2.patt`
-- Preview image to print/show: `2.png` (alias: `pattern-2.png`) — this is the marker the camera should see
+- Preview image to print/show: `2.png` (alias: `pattern-2.png`) - this is the marker the camera should see
 - Keep both files in the repo root (or same folder as `index.html`) so the AR marker loads.
