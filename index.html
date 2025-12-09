@@ -297,12 +297,12 @@
             isDancing: true,
 
 
-            bloomThreshold: 0.35,
-            bloomStrength: 0.4,
-            bloomRadius: 0.12,
-            baseScale: 0.5,
-            maxPixelRatio: 1.1,
-            snowCount: 450
+            bloomThreshold: 0.3,
+            bloomStrength: 0.6,
+            bloomRadius: 0.15,
+            baseScale: 0.75,
+            maxPixelRatio: 2,
+            snowCount: 1000
 
         };
 
@@ -386,7 +386,7 @@
 
             renderer.setSize(window.innerWidth, window.innerHeight);
 
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.maxPixelRatio)); // Cap pixel ratio for performance (mobile-friendly)
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, config.maxPixelRatio)); // Higher cap restored
 
             renderer.toneMapping = THREE.ReinhardToneMapping;
 
@@ -981,7 +981,7 @@
 
         function buildBinarySnow() {
 
-            const count = config.snowCount || 450;
+            const count = config.snowCount || 1000;
 
             const geometry = new THREE.BufferGeometry();
 
@@ -1106,8 +1106,8 @@
             try {
                 arToolkitSource = new THREEx.ArToolkitSource({
                     sourceType: 'webcam',
-                    sourceWidth: 640,
-                    sourceHeight: 480
+                    sourceWidth: 1280,
+                    sourceHeight: 720
                 });
 
                 arToolkitSource.init(() => {
